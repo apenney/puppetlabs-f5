@@ -1,7 +1,7 @@
 require 'puppet/provider/f5'
 
 Puppet::Type.type(:f5_file).provide(:f5_file, :parent => Puppet::Provider::F5) do
-  @doc = "Manages f5 String classes (datagroups)"
+  @doc = 'Manages f5 String classes (datagroups)'
 
   confine :feature => :posix
   defaultfor :feature => :posix
@@ -20,7 +20,7 @@ Puppet::Type.type(:f5_file).provide(:f5_file, :parent => Puppet::Provider::F5) d
   end
 
   def content
-    return "md5(#{@md5_checksum})"
+    "md5(#@md5_checksum)"
   end
 
   def content=(value)
@@ -44,6 +44,7 @@ Puppet::Type.type(:f5_file).provide(:f5_file, :parent => Puppet::Provider::F5) d
       @md5_checksum = Digest::MD5.hexdigest(@file)
       return true
     rescue SOAP::FaultError => e
+      Puppet.debug(e)
       Puppet.debug("Puppet::Provider::F5_file: file #{resource[:name]} does not exist")
       return false
     end

@@ -71,23 +71,68 @@ describe Puppet::Type.type(:f5_user).provider(:f5_user) do
 
   describe 'user_permission' do
     it 'returns appropriate XML' do
+      fixture = File.read('spec/fixtures/f5/f5_user/get_user_permission_response.xml')
+      savon.expects(:get_user_permission).with(message: { user_names: { item: ['test'] }}).returns(fixture)
+      provider.user_permission
     end
   end
+
   describe 'user_permission=' do
+    it 'returns appropriate XML' do
+      fixture = File.read('spec/fixtures/f5/f5_user/set_user_permission_response.xml')
+      savon.expects(:set_user_permission).with(message: {:user_names=>{:item=>"test"}, :permissions=>{:item=>[[{:role=>"USER_ROLE_ADMINISTRATOR", :partition=>"[All]"}]]}}).returns(fixture)
+      provider.user_permission=({'[All]' => 'USER_ROLE_ADMINISTRATOR'})
+    end
   end
 
   describe 'password' do
+    it 'returns encrypted passwords' do
+      fixture = File.read('spec/fixtures/f5/f5_user/get_encrypted_password_response.xml')
+      savon.expects(:get_encrypted_password).with(message: { user_names: { item: ['test'] }}).returns(fixture)
+      provider.password
+    end
   end
+
   describe 'password=' do
+    it 'returns appropriate XML' do
+      fixture = File.read('spec/fixtures/f5/f5_user/change_password_2_response.xml')
+      message = {:user_names=>{:item=>"test"}, :passwords=>{:item=>{:is_encrypted=>false, :password=>"beep"}}}
+      savon.expects(:change_password_2).with(message: message).returns(fixture)
+      provider.password=({'is_encrypted' => false, 'password' => 'boo'})
+    end
   end
 
   describe 'fullname' do
+    it 'returns encrypted passwords' do
+      fixture = File.read('spec/fixtures/f5/f5_user/get_fullname_response.xml')
+      savon.expects(:get_fullname).with(message: { user_names: { item: ['test'] }}).returns(fixture)
+      provider.fullname
+    end
   end
+
   describe 'fullname=' do
+    it 'returns appropriate XML' do
+      fixture = File.read('spec/fixtures/f5/f5_user/set_fullname_response.xml')
+      message = {:user_names=>{:item=>"test"}, fullnames: {item: 'test user'}}
+      savon.expects(:set_fullname).with(message: message).returns(fixture)
+      provider.fullname=('test user')
+    end
   end
 
   describe 'login_shell' do
+    it 'returns encrypted passwords' do
+      fixture = File.read('spec/fixtures/f5/f5_user/get_login_shell_response.xml')
+      savon.expects(:get_login_shell).with(message: { user_names: { item: ['test'] }}).returns(fixture)
+      provider.login_shell
+    end
   end
+
   describe 'login_shell=' do
+    it 'returns appropriate XML' do
+      fixture = File.read('spec/fixtures/f5/f5_user/set_login_shell_response.xml')
+      message = {:user_names=>{:item=>"test"}, :shells=>{:item=>"test user"}}
+      savon.expects(:set_login_shell).with(message: message).returns(fixture)
+      provider.login_shell=('test user')
+    end
   end
 end

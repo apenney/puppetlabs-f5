@@ -5,14 +5,12 @@ describe Puppet::Type.type(:f5_user).provider(:f5_user) do
   include Savon::SpecHelper
 
   before(:all) {
-    # All creations of provider instances seem to call this
     message = { folder: "/Common" }
     fixture = File.read("spec/fixtures/f5/management_partition/set_active_folder.xml")
     savon.expects(:set_active_folder).with(message: message).returns(fixture)
   }
 
   before(:each) {
-    # Turn on mocking for savon
     savon.mock!
 
     # Fake url to initialize the device against

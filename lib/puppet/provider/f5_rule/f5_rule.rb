@@ -50,6 +50,8 @@ Puppet::Type.type(:f5_rule).provide(:f5_rule, :parent => Puppet::Provider::F5) d
   def definition=(val)
     Puppet.debug("Puppet::Provider::F5_Rule: updating #{resource[:name]} rule definition")
     rule = {"rule_name" => resource[:name], "rule_definition" => val}
+    require 'pry'
+    binding.pry
     transport[wsdl].call(:modify_rule, message: {rules: { item: rule }})
   end
 

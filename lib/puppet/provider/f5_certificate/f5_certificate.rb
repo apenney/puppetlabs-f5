@@ -79,12 +79,12 @@ Puppet::Type.type(:f5_certificate).provide(:f5_certificate, :parent => Puppet::P
     # Replace key/cert altogether in one step if they are bundled.
     if resource[:real_content].match(/([-| ]*BEGIN [R|D]SA (?:PRIVATE|PUBLIC) KEY[-| ]*.*?[-| ]*END [R|D]SA (?:PRIVATE|PUBLIC) KEY[-| ]*)/m)
       transport[wsdl].call(:key_delete, message: { mode: resource[:mode], key_ids: { item: resource[:name] }})
-      transport[wsdl].call(:certificate_delete, message: { mode: resource[:mode], key_ids: { item: resource[:name] }})
+      transport[wsdl].call(:certificate_delete, message: { mode: resource[:mode], cert_ids: { item: resource[:name] }})
       transport[wsdl].call(:key_import_from_pem, message: { mode: resource[:mode], key_ids: { item: resource[:name] }, pem_data: { item: resource[:real_content] }, overwrite: true})
-      transport[wsdl].call(:certificate_import_from_pem, message: { mode: resource[:mode], key_ids: { item: resource[:name] }, pem_data: { item: resource[:real_content] }, overwrite: true})
+      transport[wsdl].call(:certificate_import_from_pem, message: { mode: resource[:mode], cert_ids: { item: resource[:name] }, pem_data: { item: resource[:real_content] }, overwrite: true})
     else
       # If not bundled.
-      transport[wsdl].call(:certificate_import_from_pem, message: { mode: resource[:mode], key_ids: { item: resource[:name] }, pem_data: { item: resource[:real_content] }, overwrite: true})
+      transport[wsdl].call(:certificate_import_from_pem, message: { mode: resource[:mode], cert_ids: { item: resource[:name] }, pem_data: { item: resource[:real_content] }, overwrite: true})
     end
   end
 

@@ -11,25 +11,33 @@ module Puppet::Util::NetworkDevice::F5
       @hostname = hostname
       @username = username
       @password = password
-      @directory = File.join(File.dirname(__FILE__), '..', 'wsdl')
       @wsdls = wsdls
       @endpoint = '/iControl/iControlPortal.cgi'
       @interfaces = {}
     end
 
+    def testing?
+      false
+    end
+
+    def wsdl_location(wsdl)
+      if self.testing?
+        directory = File.join(File.dirname(__FILE__), '..', 'wsdl')
+        File.join(directory, wsdl + '.wsdl')
+      else
+        "https://#{@hostname}#{@endpoint}?WSDL=#{wsdl}"
+      end
+    end
+
     def get_interfaces
       @wsdls.each do |wsdl|
-        # We use + here to ensure no / between wsdl and .wsdl
-        wsdl_path = File.join(@directory, wsdl + '.wsdl')
 
-        if File.exists? wsdl_path
-          namespace = 'urn:iControl:' + wsdl.gsub(/(.*)\.(.*)/, '\1/\2')
-          url = 'https://' + @hostname + '/' + @endpoint
-          @interfaces[wsdl] = Savon.client(wsdl: wsdl_path, ssl_verify_mode: :none,
-            basic_auth: [@username, @password], endpoint: url,
-            namespace: namespace, convert_request_keys_to: :none,
-            strip_namespaces: true, log: false)
-        end
+        namespace = 'urn:iControl:' + wsdl.gsub(/(.*)\.(.*)/, '\1/\2')
+        url = 'https://' + @hostname + '/' + @endpoint
+        @interfaces[wsdl] = Savon.client(wsdl: self.wsdl_location(wsdl), ssl_verify_mode: :none,
+          basic_auth: [@username, @password], endpoint: url,
+          namespace: namespace, convert_request_keys_to: :none,
+          strip_namespaces: true, log: false)
       end
 
       @interfaces

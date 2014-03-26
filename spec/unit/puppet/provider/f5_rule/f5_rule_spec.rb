@@ -5,6 +5,7 @@ describe Puppet::Type.type(:f5_rule).provider(:f5_rule) do
   include Savon::SpecHelper
 
   before(:all) {
+    Puppet::Util::NetworkDevice::F5::Transport.expects(:testing?).returns(true)
     message = { folder: "/Common" }
     fixture = File.read("spec/fixtures/f5/management_partition/set_active_folder.xml")
     savon.expects(:set_active_folder).with(message: message).returns(fixture)

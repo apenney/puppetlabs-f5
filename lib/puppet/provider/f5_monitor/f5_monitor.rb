@@ -20,10 +20,10 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
     f5monitors = Array.new
     monitor = Hash.new
 
-    transport[wsdl].get_template_list.collect do |monitor_template|
-      monitor = { :name => monitor_template.template_name,
+    transport[wsdl].call(:get_template_list).body[:get_template_list_response][:return][:item].collect do |monitor_template|
+      monitor = { :name => monitor_template[:template_name],
                   :ensure => :present,
-                  :type => monitor_template.template_type }
+                  :type => monitor_template[:template_type] }
       f5monitors << new(monitor)
     end
     f5monitors
@@ -51,20 +51,15 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
 
   methods.each do |method|
     define_method(method.to_sym) do
-      if transport[wsdl].respond_to?("get_#{method}".to_sym)
-        transport[wsdl].send("get_#{method}", @property_hash[:name]).first.to_s
-      end
+      call = "get_#{method}".to_sym
+      transport[wsdl].call(call, message: { template_names: @property_hash[:name]}).body["get_#{method}_response".to_sym][:return]
     end
-  end
 
-  methods.each do |method|
     define_method("#{method}=") do |value|
-      if transport[wsdl].respond_to?("set_#{method}".to_sym)
-        # Without this it appears to skip resources attributes on creation.
-        namevar = @property_hash[:name] || resource[:name]
-        raise Puppet::Error, "Puppet::Provider::F5_monitor: missing namevar for resource" unless namevar
-        transport[wsdl].send("set_#{method}", namevar, value)
-      end
+      # Without this it appears to skip resources attributes on creation.
+     # namevar = @property_hash[:name] || resource[:name]
+      raise Puppet::Error, "Puppet::Provider::F5_monitor: missing namevar for resource" unless namevar
+      transport[wsdl].call("set_#{method}".to_sym, message: { template_names: { item: value}})
     end
   end
 
@@ -81,28 +76,27 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
   end
 
   def template_destination
-    destinations= transport[wsdl].get_template_destination(resource[:name])
-    system = destinations.first
+    destination = transport[wsdl].call(:get_template_destination, message: { template_names: { item: resource[:name]}}).body[:get_template_destination_response][:return][:item]
     # need F5 eng review: http://devcentral.f5.com/wiki/iControl.LocalLB__AddressType.ashx
-    #Puppet.debug("Puppet::Provider::F5_monitor: template destination address type #{system.address_type} address #{system.ipport.address} port #{system.ipport.port}")
-    case system.address_type
+    case destination[:address_type]
     when 'ATYPE_STAR_ADDRESS_STAR_PORT'
       [ 'ATYPE_STAR_ADDRESS_STAR_PORT', "*:*" ]
     when 'ATYPE_STAR_ADDRESS_EXPLICIT_PORT'
-      [ 'ATYPE_STAR_ADDRESS_EXPLICIT_PORT', "*:#{system.ipport.port}" ]
+      [ 'ATYPE_STAR_ADDRESS_EXPLICIT_PORT', "*:#{destination[:ipport][:port]}" ]
     when 'ATYPE_EXPLICIT_ADDRESS_EXPLICIT_PORT'
-      [ 'ATYPE_EXPLICIT_ADDRESS_EXPLICIT_PORT', "#{system.ipport.address}:#{system.ipport.port}" ]
+      [ 'ATYPE_EXPLICIT_ADDRESS_EXPLICIT_PORT', "#{destination[:ipport][:address]}:#{destination[:ipport][:port]}" ]
     when 'ATYPE_STAR_ADDRESS'
       [ 'ATYPE_STAR_ADDRESS', "*:*" ]
     when 'ATYPE_EXPLICIT_ADDRESS'
-      [ 'ATYPE_EXPLICIT_ADDRESS', "#{system.ipport.address}:*" ]
+      [ 'ATYPE_EXPLICIT_ADDRESS', "#{destination[:ipport][:address]}:*" ]
     else
-      [ 'ATYPE_UNSET', "#{system.ipport.address}:#{system.ipport.port}" ]
+      [ 'ATYPE_UNSET', "#{destination[:ipport][:address]}:#{destination[:ipport][:port]}" ]
     end
   end
 
   def template_destination=(value)
-    transport[wsdl].set_template_destination([resource[:name]], [monitor_ipport(resource[:template_destination])])
+    message = { template_names: { item: resource[:name]}, destinations: monitor_ipport(resource[:template_destination])}
+    transport[wsdl].call(:set_template_destination, message: message)
   end
 
   def template_integer_property
@@ -118,7 +112,8 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
 
     template_integer = {}
     properties.each do |property|
-      template_integer[property] = transport[wsdl].get_template_integer_property(@property_hash[:name],property).first.value
+      message = { template_names: { item: @property_hash[:name] }, property_types: { item: property }}
+      template_integer[property] = transport[wsdl].call(:get_template_integer_property, message: message).body[:get_template_integer_property_response][:return][:item]
     end
     template_integer
   end
@@ -126,7 +121,8 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
   def template_integer_property=(value)
     resource[:template_integer_property].each do |k, v|
       # Trying to configure ITYPE_UNSET results in Exception: Common::OperationFailed
-      transport[wsdl].set_template_integer_property(resource[:name], [{:type => k, :value => v}]) unless k == 'ITYPE_UNSET'
+      message = { template_names: { item: resource[:name] }, values: { item: [{:type => k, :value => v}]}}
+      transport[wsdl].call(:set_template_integer_property, message: message) unless k == 'ITYPE_UNSET'
     end
   end
 
@@ -228,11 +224,12 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
     template_string = {}
     properties.each do |property|
       begin
-        template_string[property] = transport[wsdl].get_template_string_property(@property_hash[:name],property).first.value
+        message = { template_names: { item: @property_hash[:name] }, property_types: { item: property }}
+        template_string[property] = transport[wsdl].call(:get_template_string_property, message: message).body[:get_template_string_property_response][:return][:item]
       rescue Exception => e
         # Not all string property are supported for every template type, so we are ignoring all failures.
         # Disable debug message since it's too much noise.
-        #Puppet.debug("Puppet::Provider::F5_Monitor: ignoring get_template_string_property exception \n #{e.message}")
+        Puppet.debug("Puppet::Provider::F5_Monitor: ignoring get_template_string_property exception \n #{e.message}")
       end
     end
     template_string
@@ -240,12 +237,14 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
 
   def template_string_property=(value)
     resource[:template_string_property].each do |k, v|
-      transport[wsdl].set_template_string_property(resource[:name], [{:type => k, :value => v}])
+      message = { template_names: { item: resource[:name] }, property_types: { item: [{:type => k, :value => v}] }}
+      transport[wsdl].call(:set_template_string_property, message: message)
     end
   end
 
   def template_type
-    transport[wsdl].get_template_type(@property_hash[:name]).first
+    message = { template_names: { item: @property_hash[:name]}}
+    transport[wsdl].call(:get_template_type, message: message).body[:get_template_type_response][:return][:item]
   end
 
   def template_type=(value)
@@ -283,7 +282,8 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
                           :is_read_only       => resource[:is_read_only],
                           :is_directly_usable => resource[:is_directly_usable] }
 
-    transport[wsdl].create_template([monitor_template], [common_attributes])
+    message = { templates: { item: [monitor_template] }, template_attributes: { item: [common_attributes]}}
+    transport[wsdl].call(:create_template, message: message)
 
     # Update other monitor attributes after resource creation.
     methods = [
@@ -304,7 +304,7 @@ Puppet::Type.type(:f5_monitor).provide(:f5_monitor, :parent => Puppet::Provider:
   def destroy
     Puppet.debug("Puppet::Provider::F5_Monitor: deleting F5 monitor #{resource[:name]}")
     @property_hash[:ensure] = :absent
-    transport[wsdl].delete_template(@property_hash[:name])
+    transport[wsdl].call(:delete_template, message: { template_names: { item: @property_hash[:name]}})
   end
 
   def exists?
